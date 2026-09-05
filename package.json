@@ -1,0 +1,42 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "nihongo-typer",
+  "title": "Nihongo Typer",
+  "description": "Instantly convert Romaji into Hiragana and Katakana as you type, and copy the result with Enter.",
+  "icon": "icon.png",
+  "author": "theseriouscatttt",
+  "license": "GPL-3.0-only",
+  "categories": [
+    "Productivity",
+    "Other"
+  ],
+  "commands": [
+    {
+      "name": "convert",
+      "title": "Convert Romaji to Kana",
+      "subtitle": "Nihongo Typer",
+      "description": "Type Romaji and get instant Hiragana and Katakana conversions",
+      "mode": "view"
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.90.0",
+    "@raycast/utils": "^1.17.0",
+    "wanakana": "^5.3.1"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^1.0.11",
+    "@types/node": "20.8.10",
+    "@types/react": "18.3.3",
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.4.5"
+  },
+  "scripts": {
+    "build": "ray build",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint",
+    "publish": "npx @raycast/api@latest publish"
+  }
+}
