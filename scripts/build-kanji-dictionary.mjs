@@ -213,6 +213,10 @@ writeFileSync(
     version: raw.version,
     license:
       "CC BY-SA 4.0 — JMdict/EDICT project, Electronic Dictionary Research and Development Group",
+    // Shipped so convert.tsx can drop the same stopwords from a query that were
+    // dropped when indexing; keeping a second hand-written copy in the extension
+    // would silently drift from this one.
+    stopwords: [...ENGLISH_STOPWORDS],
     words: wordList,
     entries: englishEntries,
   }),

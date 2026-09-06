@@ -56,30 +56,58 @@ const englishWords = englishIndexData.words as WordEntry[];
 const englishIndex = new Map<string, number[]>(
   englishIndexData.entries as [string, number[]][],
 );
+// Same list the index was built with, shipped in the data file rather than
+// restated here so the two can't drift apart.
+const englishStopwords = new Set(englishIndexData.stopwords as string[]);
 
 function searchEnglish(query: string): WordEntry[] {
+  // Stopwords are dropped rather than matched: they were never indexed, and
+  // requiring them as a literal substring of the gloss is what made "cup of tea"
+  // return nothing while "cup tea" worked (no gloss spells out "of").
   const words = query
     .toLowerCase()
     .split(/[^a-z']+/)
-    .filter((w) => w.length >= ENGLISH_MIN_WORD_LENGTH);
+    .filter(
+      (w) => w.length >= ENGLISH_MIN_WORD_LENGTH && !englishStopwords.has(w),
+    );
   if (words.length === 0) return [];
 
-  // Stopwords ("the", "for", ...) are never indexed at build time, so anchor the
-  // lookup on the first word that actually has an index entry — otherwise a query
-  // like "the cat" would search "the", miss, and return nothing.
-  const anchorPosition = words.findIndex((w) => englishIndex.has(w));
-  if (anchorPosition === -1) return [];
+  const indexed = words.filter((w) => englishIndex.has(w));
+  if (indexed.length === 0) return [];
 
-  const indices = englishIndex.get(words[anchorPosition]);
-  if (!indices) return [];
-  const rest = words.filter((_, i) => i !== anchorPosition);
+  // Anchor on the *most specific* word — the one with the fewest candidates —
+  // rather than the first one. Each token keeps only its top
+  // MAX_CANDIDATES_PER_TOKEN entries, so anchoring on a broad adjective like
+  // "green" searches a truncated list that may not contain the compound the
+  // user means, while its narrower partner ("tea") usually does.
+  const bySpecificity = [...indexed].sort(
+    (a, b) => englishIndex.get(a)!.length - englishIndex.get(b)!.length,
+  );
+  const [anchor, ...otherIndexed] = bySpecificity;
+  const anchorIndices = englishIndex.get(anchor)!;
 
-  const candidates = indices.map((i) => englishWords[i]);
+  // Prefer a real intersection of the per-word candidate sets; fall back to the
+  // looser "anchor candidates whose gloss mentions the other words" when the
+  // truncated lists don't overlap.
+  const otherSets = otherIndexed.map((w) => new Set(englishIndex.get(w)!));
+  const intersection = anchorIndices.filter((i) =>
+    otherSets.every((set) => set.has(i)),
+  );
+  const matched = intersection.length > 0;
+
+  // A word that is in no gloss at all can't be dropped like a stopword — it is
+  // a real constraint the user typed, so it must still exclude everything.
+  const unknown = words.filter((w) => !englishIndex.has(w));
+  const glossFilters = matched ? unknown : [...otherIndexed, ...unknown];
+
+  const candidates = (matched ? intersection : anchorIndices).map(
+    (i) => englishWords[i],
+  );
   const filtered =
-    rest.length === 0
+    glossFilters.length === 0
       ? candidates
       : candidates.filter((c) =>
-          rest.every((w) => c.gloss.toLowerCase().includes(w)),
+          glossFilters.every((w) => c.gloss.toLowerCase().includes(w)),
         );
   return filtered.slice(0, ENGLISH_MAX_RESULTS);
 }
