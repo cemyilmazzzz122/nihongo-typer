@@ -6,7 +6,6 @@ import {
   Icon,
   List,
   LocalStorage,
-  closeMainWindow,
   getPreferenceValues,
   showHUD,
 } from "@raycast/api";
@@ -16,7 +15,7 @@ import englishIndexData from "./data/english-index.json";
 
 const HISTORY_KEY = "history";
 const HISTORY_LIMIT = 10;
-const ENGLISH_MIN_WORD_LENGTH = 3;
+const ENGLISH_MIN_WORD_LENGTH = 2;
 const ENGLISH_MAX_RESULTS = 8;
 const KANJI_SCRIPT = /[一-龯]/;
 const JAPANESE_SCRIPT = /[぀-ヿ一-龯]/;
@@ -65,9 +64,15 @@ function searchEnglish(query: string): WordEntry[] {
     .filter((w) => w.length >= ENGLISH_MIN_WORD_LENGTH);
   if (words.length === 0) return [];
 
-  const [first, ...rest] = words;
-  const indices = englishIndex.get(first);
+  // Stopwords ("the", "for", ...) are never indexed at build time, so anchor the
+  // lookup on the first word that actually has an index entry — otherwise a query
+  // like "the cat" would search "the", miss, and return nothing.
+  const anchorPosition = words.findIndex((w) => englishIndex.has(w));
+  if (anchorPosition === -1) return [];
+
+  const indices = englishIndex.get(words[anchorPosition]);
   if (!indices) return [];
+  const rest = words.filter((_, i) => i !== anchorPosition);
 
   const candidates = indices.map((i) => englishWords[i]);
   const filtered =
@@ -83,20 +88,53 @@ function searchEnglish(query: string): WordEntry[] {
 // data: wanakana has no kanji-reading knowledge (that needs a morphological
 // analyzer like MeCab/Kuromoji), so pasted Kanji can only be read back via an
 // exact-match lookup against this bundled dictionary, not via wanakana.toRomaji.
-const kanjiToReadings = new Map<string, ReadingCandidate[]>();
-for (const [reading, candidates] of kanjiDictionary) {
-  for (const candidate of candidates) {
-    if (!kanjiToReadings.has(candidate.kanji)) {
-      kanjiToReadings.set(candidate.kanji, []);
+// It is built lazily on the first Kanji lookup rather than at module load: inverting
+// the whole dictionary is a 30k+ iteration pass that would otherwise run on every
+// launch, including the common case where the user only ever types Romaji.
+let kanjiToReadings: Map<string, ReadingCandidate[]> | undefined;
+
+function readingsForKanji(kanji: string): ReadingCandidate[] {
+  if (!kanjiToReadings) {
+    kanjiToReadings = new Map<string, ReadingCandidate[]>();
+    for (const [reading, candidates] of kanjiDictionary) {
+      for (const candidate of candidates) {
+        let readings = kanjiToReadings.get(candidate.kanji);
+        if (!readings) {
+          readings = [];
+          kanjiToReadings.set(candidate.kanji, readings);
+        }
+        readings.push({ reading, gloss: candidate.gloss });
+      }
     }
-    kanjiToReadings
-      .get(candidate.kanji)!
-      .push({ reading, gloss: candidate.gloss });
   }
+  return kanjiToReadings.get(kanji) ?? [];
 }
 
 function normalizeRomaji(input: string): string {
   return input.replace(/tch/gi, "cch");
+}
+
+// IMEMode leaves a word-final lone "n" as latin, since a real IME must wait to
+// see whether the user is still typing "na"/"ni"/... . The search bar shows a
+// finished result rather than a mid-composition buffer, so complete it here:
+// without this, "nihon" renders as にほn and the dictionary lookup for にほん
+// (and every other word ending in ん) silently misses.
+function completeTrailingN(kana: string, syllabicN: string): string {
+  return kana.replace(/n$/, syllabicN);
+}
+
+function toHiraganaFinal(input: string): string {
+  return completeTrailingN(
+    wanakana.toHiragana(input, { IMEMode: true }),
+    "\u3093",
+  );
+}
+
+function toKatakanaFinal(input: string): string {
+  return completeTrailingN(
+    wanakana.toKatakana(input, { IMEMode: true }),
+    "\u30f3",
+  );
 }
 
 async function loadHistory(): Promise<HistoryEntry[]> {
@@ -133,15 +171,12 @@ export default function Command() {
   const kanjiOnlyMode = reverseMode && containsKanji;
   const pureKanaMode = reverseMode && !containsKanji;
 
-  const normalized = useMemo(() => normalizeRomaji(input), [input]);
-  const hiragana = useMemo(
-    () => wanakana.toHiragana(normalized, { IMEMode: true }),
-    [normalized],
-  );
-  const katakana = useMemo(
-    () => wanakana.toKatakana(normalized, { IMEMode: true }),
-    [normalized],
-  );
+  // Conversion runs on the trimmed input: a trailing space would otherwise be
+  // carried into the copied kana and, worse, into the dictionary lookup key,
+  // where the exact match ("ねこ " vs "ねこ") drops every Kanji suggestion.
+  const normalized = useMemo(() => normalizeRomaji(trimmed), [trimmed]);
+  const hiragana = useMemo(() => toHiraganaFinal(normalized), [normalized]);
+  const katakana = useMemo(() => toKatakanaFinal(normalized), [normalized]);
   const romaji = useMemo(
     () => (pureKanaMode ? wanakana.toRomaji(trimmed) : ""),
     [pureKanaMode, trimmed],
@@ -154,7 +189,7 @@ export default function Command() {
     [kanjiOnlyMode, readingForLookup],
   );
   const kanjiReadings = useMemo(
-    () => (kanjiOnlyMode ? (kanjiToReadings.get(trimmed) ?? []) : []),
+    () => (kanjiOnlyMode ? readingsForKanji(trimmed) : []),
     [kanjiOnlyMode, trimmed],
   );
   const englishResults = useMemo(
@@ -197,7 +232,6 @@ export default function Command() {
           onAction={async () => {
             await Clipboard.copy(kana);
             onUsed();
-            await closeMainWindow();
             await showHUD(`Copied "${kana}"`);
           }}
         />
@@ -268,9 +302,14 @@ export default function Command() {
     return (
       <List.Section title="English → Japanese">
         {englishResults.map((result, index) => {
+          // The index stores each reading in its native script (loanwords stay
+          // Katakana), so label the action after what the reading actually is.
+          const readingLabel = wanakana.isKatakana(result.reading)
+            ? "Katakana"
+            : "Hiragana";
           const entry: HistoryEntry = {
             input: trimmed,
-            hiragana: result.reading,
+            hiragana: wanakana.toHiragana(result.reading),
             katakana: wanakana.toKatakana(result.reading),
             kanji: result.kanji,
           };
@@ -290,7 +329,7 @@ export default function Command() {
                     buildActions(result.kanji, "Kanji", () =>
                       recordHistory(entry),
                     )}
-                  {buildActions(result.reading, "Hiragana", () =>
+                  {buildActions(result.reading, readingLabel, () =>
                     recordHistory(entry),
                   )}
                 </ActionPanel>
@@ -302,7 +341,7 @@ export default function Command() {
     );
   }
 
-  const showHistory = keepHistory && input.length === 0 && history.length > 0;
+  const showHistory = keepHistory && trimmed.length === 0 && history.length > 0;
 
   return (
     <List
@@ -311,7 +350,7 @@ export default function Command() {
       onSearchTextChange={setInput}
       filtering={false}
     >
-      {input.length === 0 ? (
+      {trimmed.length === 0 ? (
         showHistory ? (
           <List.Section title="Recent">
             {history.map((entry) => (
