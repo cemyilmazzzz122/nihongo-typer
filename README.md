@@ -1,8 +1,10 @@
 # Nihongo Typer
 
-A Raycast extension that converts Romaji into Hiragana and Katakana in real time — no need to switch your system keyboard layout to Japanese.
+A Raycast extension that converts Romaji into Hiragana, Katakana, and common-word Kanji in real time — no need to switch your system keyboard layout to Japanese.
 
-If you're learning Japanese, researching a trip, or looking up an authentic recipe, this lets you type a word the way you already type (Latin letters) and get both kana readings instantly, ready to paste anywhere.
+If you're learning Japanese, researching a trip, or looking up an authentic recipe, this lets you type a word the way you already type (Latin letters) and get kana readings — plus likely Kanji spellings for known words — instantly, ready to paste anywhere.
+
+This is a quick lookup tool, not a full Japanese input method: Kanji suggestions come from a bundled dictionary of common single words, matched by exact reading, not from a grammar-aware conversion engine. It won't turn a full sentence into natural Kanji the way switching your OS to a Japanese IME would — for that, this is a shortcut for one word at a time, not a replacement.
 
 ## Command
 
@@ -12,10 +14,24 @@ Open the command and start typing a word using Latin letters.
 
 - The **Hiragana** reading is listed first (e.g. `matcha` → `まっちゃ`).
 - The **Katakana** reading is listed right below it (e.g. `matcha` → `マッチャ`).
-- Press <kbd>Enter</kbd> on either result to copy it to the clipboard and close Raycast.
-- Use the secondary action (<kbd>⌘</kbd><kbd>Enter</kbd> from the action panel) to copy without closing the window, if you want to keep typing more words.
+- Press <kbd>Enter</kbd> on either result to run your configured primary action (see **Preferences** below).
+- Open the action panel (<kbd>⌘</kbd><kbd>K</kbd>) for the other ways to use a result: copy without closing Raycast, or paste directly into the frontmost app.
 
 Both results update on every keystroke, so you can see the conversion build up character by character as you type.
+
+### Kanji suggestions
+
+If the current Hiragana reading matches a common Japanese word, a **Kanji** section appears below with every known spelling for that word (e.g. `matcha` → `抹茶`), each with a short English gloss as its subtitle so you can tell homophones apart (e.g. `hashi` → `箸` "chopsticks" vs `橋` "bridge" vs `端` "edge"). Copy or paste any candidate the same way as a kana result.
+
+Matching is exact-reading, single-word lookup against a bundled dictionary of ~17,000 common words — it won't segment or convert a multi-word phrase or full sentence into Kanji.
+
+### Reverse lookup: Kana to Romaji
+
+Paste or type Hiragana, Katakana, or Kanji into the search bar and the command switches to a single **Romaji** result instead, so you can go the other direction without a separate command.
+
+### Recent conversions
+
+By default, the last 10 romaji lookups are remembered and shown as a **Recent** list whenever the search bar is empty, so you can quickly re-copy a word without retyping it. Turn this off in **Preferences** if you'd rather nothing be remembered between searches.
 
 ## Conversion notes
 
@@ -23,9 +39,22 @@ Both results update on every keystroke, so you can see the conversion build up c
 - As a convenience, `tch` is also treated as a sokuon trigger, so the common casual spelling `matcha` converts correctly instead of requiring the stricter `maccha`.
 - Long vowels, youon (combined sounds like `kya`, `sha`, `cho`), and the particle-style `n` are all handled automatically.
 
+## Preferences
+
+- **Primary Action** — what pressing <kbd>Enter</kbd> on a result does: copy and close Raycast (default), copy only, or paste to the frontmost app.
+- **Recent Conversions** — toggle whether recent conversions are remembered and shown when the search bar is empty. Enabled by default.
+
 ## Privacy
 
-All conversion happens entirely locally, in-process. No network requests are made and no text you type ever leaves your machine.
+All conversion happens entirely locally, in-process. No network requests are made and no text you type ever leaves your machine. Recent conversions (when enabled) are stored only in Raycast's local, on-device storage for this extension — never synced or sent anywhere. The Kanji dictionary is a static file bundled with the extension, not a live lookup service.
+
+## Kanji dictionary & attribution
+
+Kanji suggestions are generated ahead of time (see `scripts/build-kanji-dictionary.mjs`) from the `jmdict-eng-common` release of [jmdict-simplified](https://github.com/scriptin/jmdict-simplified), itself built from the **JMdict/EDICT** dictionary files.
+
+This software uses the JMdict/EDICT dictionary files. These files are the property of the Electronic Dictionary Research and Development Group, and are used in conformance with the Group's licence.
+
+The dictionary data (`src/data/kanji-dictionary.json`) is licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) by the EDRDG — this applies to that data file only; the extension's own source code is MIT licensed (see [License](#license)).
 
 ## Development
 
@@ -36,6 +65,8 @@ npm run build   # type-check and build
 npm run lint    # lint against Raycast's extension rules
 ```
 
+To regenerate `src/data/kanji-dictionary.json` from a newer `jmdict-simplified` release, see the usage comment at the top of `scripts/build-kanji-dictionary.mjs`.
+
 ## License
 
-Licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
+Licensed under the MIT License. See [LICENSE](LICENSE).

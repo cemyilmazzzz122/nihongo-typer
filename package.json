@@ -2,10 +2,10 @@
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "nihongo-typer",
   "title": "Nihongo Typer",
-  "description": "Raycast extension that converts Romaji typed into the search bar into Hiragana and Katakana in real time.",
+  "description": "Raycast extension that converts Romaji typed into the search bar into Hiragana, Katakana, and common-word Kanji in real time.",
   "icon": "icon.png",
   "author": "theseriouscatttt",
-  "license": "GPL-3.0-only",
+  "license": "MIT",
   "categories": [
     "Productivity",
     "Other"
@@ -16,7 +16,31 @@
       "title": "Convert Romaji to Kana",
       "subtitle": "Nihongo Typer",
       "description": "Type Romaji and get instant Hiragana and Katakana conversions",
-      "mode": "view"
+      "mode": "view",
+      "preferences": [
+        {
+          "name": "primaryAction",
+          "title": "Primary Action",
+          "description": "What pressing Enter on a result does",
+          "type": "dropdown",
+          "required": false,
+          "default": "copyAndClose",
+          "data": [
+            { "title": "Copy and Close Raycast", "value": "copyAndClose" },
+            { "title": "Copy Only", "value": "copyOnly" },
+            { "title": "Paste to Active App", "value": "paste" }
+          ]
+        },
+        {
+          "name": "keepHistory",
+          "title": "Recent Conversions",
+          "description": "Remember recent conversions and show them when the search bar is empty",
+          "type": "checkbox",
+          "label": "Keep a history of recent conversions",
+          "required": false,
+          "default": true
+        }
+      ]
     }
   ],
   "dependencies": {
