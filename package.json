@@ -3,6 +3,20 @@
   "name": "nihongo-typer",
   "title": "Nihongo Typer",
   "description": "Raycast extension that converts Romaji typed into the search bar into Hiragana, Katakana, and common-word Kanji in real time, plus reverse Kanji lookup and English word search.",
+  "keywords": [
+    "japanese",
+    "romaji",
+    "hiragana",
+    "katakana",
+    "kanji",
+    "kana",
+    "furigana",
+    "ime",
+    "dictionary",
+    "anki",
+    "jmdict",
+    "transliterate"
+  ],
   "icon": "icon.png",
   "author": "cemyilmazzzz122",
   "license": "MIT",
@@ -16,6 +30,16 @@
       "title": "Convert Romaji to Kana",
       "subtitle": "Nihongo Typer",
       "description": "Type Romaji and get instant Hiragana and Katakana conversions",
+      "keywords": [
+        "japanese",
+        "hiragana",
+        "katakana",
+        "kanji",
+        "ime",
+        "furigana",
+        "nihongo",
+        "transliterate"
+      ],
       "mode": "view",
       "preferences": [
         {
@@ -78,6 +102,15 @@
       "title": "Convert Clipboard",
       "subtitle": "Nihongo Typer",
       "description": "Convert Romaji in the clipboard to Kana and paste it into the active app",
+      "keywords": [
+        "japanese",
+        "romaji",
+        "kana",
+        "hiragana",
+        "katakana",
+        "paste",
+        "ime"
+      ],
       "mode": "no-view",
       "preferences": [
         {
