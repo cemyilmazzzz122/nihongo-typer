@@ -6,13 +6,16 @@ export interface KanjiCandidate {
   kanji: string;
   gloss: string;
   pos?: string;
-  common: boolean;
+  // Only present (and only ever `true`) on entries JMdict marks common — the
+  // build script omits it otherwise to keep the bundled file small.
+  common?: boolean;
 }
 
 export interface ReadingCandidate {
   reading: string;
   gloss: string;
   pos?: string;
+  common?: boolean;
 }
 
 export const kanjiDictionary = new Map<string, KanjiCandidate[]>(
@@ -53,6 +56,7 @@ export function readingsForKanji(kanji: string): ReadingCandidate[] {
           reading,
           gloss: candidate.gloss,
           pos: candidate.pos,
+          common: candidate.common,
         });
       }
     }
@@ -62,10 +66,35 @@ export function readingsForKanji(kanji: string): ReadingCandidate[] {
 
 // wanakana cannot read Kanji, so romanizing it directly either echoes the input
 // back (猫 -> 猫) or, worse, half-converts it (食べる -> "食beru"). Kanji goes
-// through the dictionary instead; `null` means "no known reading", which callers
-// must report rather than pasting broken text.
-export function romajiForJapanese(text: string): string | null {
-  if (!KANJI_SCRIPT.test(text)) return wanakana.toRomaji(text);
+// through the dictionary instead.
+//
+// Roughly a tenth of Kanji spellings have more than one reading (案 is あん
+// "plan" or つくえ "desk"), and the reverse index's order is just dictionary
+// insertion order, not likelihood. Silently taking the first entry would paste
+// an arbitrary reading into the user's document, so the result is explicit: a
+// single reading, or the one JMdict marks common when exactly one is, otherwise
+// `ambiguous` for the caller to refuse.
+export type JapaneseRomaji =
+  | { kind: "ok"; romaji: string }
+  | { kind: "unknown" }
+  | { kind: "ambiguous"; readings: ReadingCandidate[] };
+
+export function romajiForJapanese(text: string): JapaneseRomaji {
+  if (!KANJI_SCRIPT.test(text)) {
+    return { kind: "ok", romaji: wanakana.toRomaji(text) };
+  }
+
   const readings = readingsForKanji(text);
-  return readings.length > 0 ? wanakana.toRomaji(readings[0].reading) : null;
+  if (readings.length === 0) return { kind: "unknown" };
+
+  const chosen =
+    readings.length === 1
+      ? readings[0]
+      : readings.filter((r) => r.common).length === 1
+        ? readings.find((r) => r.common)
+        : undefined;
+
+  return chosen
+    ? { kind: "ok", romaji: wanakana.toRomaji(chosen.reading) }
+    : { kind: "ambiguous", readings };
 }

@@ -196,12 +196,19 @@ for (const word of raw.words) {
 // a plain object with 17k+ literal keys makes TypeScript's JSON-module type
 // inference (and `tsc`'s checking of it) balloon; an array has one uniform
 // element type instead. Turned into a Map at runtime (see convert.tsx). The
-// `common` flag is used only to sort here, then dropped — the UI never reads it.
+// `common` flag sorts the candidates here and is also kept on common entries,
+// which the reverse (Kanji -> reading) direction uses to disambiguate.
 const kanjiEntries = [...kanjiMap].map(([reading, candidates]) => [
   reading,
   [...candidates.values()]
     .sort((a, b) => Number(b.common) - Number(a.common))
-    .map(({ kanji, gloss, pos }) => ({ kanji, gloss, pos })),
+    // `common` is emitted only when true (keeping the file small) because the
+    // reverse direction needs it: a Kanji spelling with several readings (案 =
+    // あん / つくえ) must be able to pick the likely one instead of whichever
+    // reading happened to be inserted first.
+    .map(({ kanji, gloss, pos, common }) =>
+      common ? { kanji, gloss, pos, common } : { kanji, gloss, pos },
+    ),
 ]);
 
 // Word entries are heavily shared across tokens (a single gloss like "matcha;
