@@ -21,8 +21,7 @@
   "author": "cemyilmazzzz122",
   "license": "MIT",
   "categories": [
-    "Productivity",
-    "Other"
+    "Productivity"
   ],
   "commands": [
     {
@@ -136,7 +135,6 @@
   ],
   "dependencies": {
     "@raycast/api": "^1.90.0",
-    "@raycast/utils": "^1.17.0",
     "wanakana": "^5.3.1"
   },
   "devDependencies": {

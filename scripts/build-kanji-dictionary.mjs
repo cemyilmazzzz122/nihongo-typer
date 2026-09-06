@@ -37,6 +37,10 @@ const MAX_CANDIDATES_PER_TOKEN = 12;
 // Two-letter words ("go", "do", "ox") are common enough to be worth indexing;
 // the noise ones ("of", "to", "in", ...) are already covered by ENGLISH_STOPWORDS.
 const MIN_TOKEN_LENGTH = 2;
+// Senses beyond the first still rank below it: scoreGlossTokens() scores by
+// phrase position, and joining senses keeps later ones later in the string.
+const MAX_SENSES = 3;
+const MAX_GLOSSES = 6;
 
 /**
  * Scores each meaningful word in a gloss by how central it is to the meaning,
@@ -53,9 +57,14 @@ function stripParens(text) {
   return text;
 }
 
-function scoreGlossTokens(gloss) {
+function scoreGlossTokens(senseGlosses) {
   const scores = new Map();
-  gloss.split(";").forEach((phrase, phraseIndex) => {
+  // Scored per sense, not over the joined string: a token from a *later* sense
+  // (猫 = "shamisen") is a different meaning entirely and must never outrank a
+  // token from the primary sense, otherwise adding later senses pushes good
+  // primary-sense matches out of the per-token top-N (e.g. 茶碗 losing "cup").
+  senseGlosses.forEach((senseGloss, senseIndex) =>
+  senseGloss.split(";").forEach((phrase, phraseIndex) => {
     const parens = [...phrase.matchAll(/\(([^()]*)\)/g)].map((m) => m[1]);
     const main = stripParens(phrase).trim().toLowerCase();
     const mainTokens = main
@@ -64,7 +73,8 @@ function scoreGlossTokens(gloss) {
     const isExactPrimaryPhrase = phraseIndex === 0 && main === mainTokens[0];
 
     for (const token of mainTokens) {
-      const score = isExactPrimaryPhrase ? 3 : phraseIndex === 0 ? 2 : 1;
+      const score =
+        senseIndex > 0 ? 0 : isExactPrimaryPhrase ? 3 : phraseIndex === 0 ? 2 : 1;
       if ((scores.get(token) ?? -1) < score) scores.set(token, score);
     }
     for (const paren of parens) {
@@ -75,7 +85,8 @@ function scoreGlossTokens(gloss) {
         if (!scores.has(token)) scores.set(token, 0);
       }
     }
-  });
+  }),
+  );
   return scores;
 }
 
@@ -101,14 +112,27 @@ const kanjiMap = new Map();
 const englishMap = new Map();
 
 for (const word of raw.words) {
-  const firstSense = word.sense.find((s) => s.gloss.some((g) => g.lang === "eng"));
+  const englishSenses = word.sense.filter((s) =>
+    s.gloss.some((g) => g.lang === "eng"),
+  );
+  const firstSense = englishSenses[0];
   if (!firstSense) continue;
 
-  const gloss = firstSense.gloss
-    .filter((g) => g.lang === "eng")
-    .slice(0, 3)
-    .map((g) => g.text)
-    .join("; ");
+  // Glosses are collected across senses, not just the first: a third of JMdict's
+  // common words carry more than one sense (猫 has six), and indexing only the
+  // first made every later meaning unfindable by English search and invisible in
+  // the detail pane. Capped so a many-sense word doesn't dominate the file.
+  const senseGlosses = englishSenses
+    .slice(0, MAX_SENSES)
+    .map((s) =>
+      s.gloss
+        .filter((g) => g.lang === "eng")
+        .slice(0, 3)
+        .map((g) => g.text)
+        .join("; "),
+    )
+    .filter(Boolean);
+  const gloss = senseGlosses.join("; ").split("; ").slice(0, MAX_GLOSSES).join("; ");
   if (!gloss) continue;
 
   const pos = posOf(firstSense);
@@ -162,7 +186,7 @@ for (const word of raw.words) {
     : { reading, gloss, pos };
   const common = Boolean(primaryKana.common);
 
-  for (const [token, score] of scoreGlossTokens(gloss)) {
+  for (const [token, score] of scoreGlossTokens(senseGlosses)) {
     if (!englishMap.has(token)) englishMap.set(token, []);
     englishMap.get(token).push({ entry, common, score });
   }

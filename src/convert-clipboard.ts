@@ -1,6 +1,6 @@
 import { Clipboard, getPreferenceValues, showHUD } from "@raycast/api";
-import * as wanakana from "wanakana";
 import { JAPANESE_SCRIPT, toHiraganaFinal, toKatakanaFinal } from "./romaji";
+import { romajiForJapanese } from "./dictionary";
 
 export default async function Command() {
   const { clipboardTarget } =
@@ -16,11 +16,15 @@ export default async function Command() {
   // back as Romaji, anything else is treated as Romaji to convert.
   const reverse = JAPANESE_SCRIPT.test(text);
   const converted = reverse
-    ? wanakana.toRomaji(text)
+    ? romajiForJapanese(text)
     : clipboardTarget === "katakana"
       ? toKatakanaFinal(text)
       : toHiraganaFinal(text);
 
+  if (converted === null) {
+    await showHUD(`No known reading for "${text}"`);
+    return;
+  }
   if (converted === text) {
     await showHUD("Nothing to convert");
     return;

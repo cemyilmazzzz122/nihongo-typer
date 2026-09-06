@@ -14,8 +14,8 @@ import {
   showToast,
 } from "@raycast/api";
 import * as wanakana from "wanakana";
-import kanjiDictionaryData from "./data/kanji-dictionary.json";
-import englishIndexData from "./data/english-index.json";
+import { kanjiDictionary, posTag, readingsForKanji } from "./dictionary";
+import { searchEnglish } from "./english";
 import {
   JAPANESE_SCRIPT,
   KANJI_SCRIPT,
@@ -27,8 +27,6 @@ import {
 const HISTORY_KEY = "history";
 const FAVORITES_KEY = "favorites";
 const HISTORY_LIMIT = 10;
-const ENGLISH_MIN_WORD_LENGTH = 2;
-const ENGLISH_MAX_RESULTS = 8;
 
 interface HistoryEntry {
   input: string;
@@ -36,53 +34,6 @@ interface HistoryEntry {
   katakana: string;
   kanji?: string;
   gloss?: string;
-}
-
-interface KanjiCandidate {
-  kanji: string;
-  gloss: string;
-  pos?: string;
-  common: boolean;
-}
-
-interface ReadingCandidate {
-  reading: string;
-  gloss: string;
-  pos?: string;
-}
-
-interface WordEntry {
-  reading: string;
-  kanji?: string;
-  gloss: string;
-  pos?: string;
-}
-
-const kanjiDictionary = new Map<string, KanjiCandidate[]>(
-  kanjiDictionaryData.entries as [string, KanjiCandidate[]][],
-);
-
-// English -> Japanese search data: `words` is a deduped table of { reading,
-// kanji?, gloss } entries, and `entries` maps an english gloss word to indices
-// into that table — see scripts/build-kanji-dictionary.mjs for how both are
-// derived from the same jmdict-simplified release as the kanji dictionary.
-const englishWords = englishIndexData.words as WordEntry[];
-const englishIndex = new Map<string, number[]>(
-  englishIndexData.entries as [string, number[]][],
-);
-// Same list the index was built with, shipped in the data file rather than
-// restated here so the two can't drift apart.
-const englishStopwords = new Set(englishIndexData.stopwords as string[]);
-
-// JMdict carries no JLPT levels, so the tag shown next to a dictionary result is
-// its part of speech, which JMdict does have. Codes are expanded through the
-// label table the build script emits alongside the entries.
-const posLabels = new Map<string, string>(
-  kanjiDictionaryData.posLabels as [string, string][],
-);
-
-function posTag(pos?: string): string | undefined {
-  return pos ? (posLabels.get(pos) ?? pos) : undefined;
 }
 
 const execFileAsync = promisify(execFile);
@@ -119,84 +70,6 @@ function detailMarkdown(headline: string, reading?: string) {
   return reading && reading !== headline
     ? `# ${headline}\n\n## ${reading}`
     : `# ${headline}`;
-}
-
-function searchEnglish(query: string): WordEntry[] {
-  // Stopwords are dropped rather than matched: they were never indexed, and
-  // requiring them as a literal substring of the gloss is what made "cup of tea"
-  // return nothing while "cup tea" worked (no gloss spells out "of").
-  const words = query
-    .toLowerCase()
-    .split(/[^a-z']+/)
-    .filter(
-      (w) => w.length >= ENGLISH_MIN_WORD_LENGTH && !englishStopwords.has(w),
-    );
-  if (words.length === 0) return [];
-
-  const indexed = words.filter((w) => englishIndex.has(w));
-  if (indexed.length === 0) return [];
-
-  // Anchor on the *most specific* word — the one with the fewest candidates —
-  // rather than the first one. Each token keeps only its top
-  // MAX_CANDIDATES_PER_TOKEN entries, so anchoring on a broad adjective like
-  // "green" searches a truncated list that may not contain the compound the
-  // user means, while its narrower partner ("tea") usually does.
-  const bySpecificity = [...indexed].sort(
-    (a, b) => englishIndex.get(a)!.length - englishIndex.get(b)!.length,
-  );
-  const [anchor, ...otherIndexed] = bySpecificity;
-  const anchorIndices = englishIndex.get(anchor)!;
-
-  // Prefer a real intersection of the per-word candidate sets; fall back to the
-  // looser "anchor candidates whose gloss mentions the other words" when the
-  // truncated lists don't overlap.
-  const otherSets = otherIndexed.map((w) => new Set(englishIndex.get(w)!));
-  const intersection = anchorIndices.filter((i) =>
-    otherSets.every((set) => set.has(i)),
-  );
-  const matched = intersection.length > 0;
-
-  // A word that is in no gloss at all can't be dropped like a stopword — it is
-  // a real constraint the user typed, so it must still exclude everything.
-  const unknown = words.filter((w) => !englishIndex.has(w));
-  const glossFilters = matched ? unknown : [...otherIndexed, ...unknown];
-
-  const candidates = (matched ? intersection : anchorIndices).map(
-    (i) => englishWords[i],
-  );
-  const filtered =
-    glossFilters.length === 0
-      ? candidates
-      : candidates.filter((c) =>
-          glossFilters.every((w) => c.gloss.toLowerCase().includes(w)),
-        );
-  return filtered.slice(0, ENGLISH_MAX_RESULTS);
-}
-
-// Reverse index (kanji spelling -> possible readings), built once from the same
-// data: wanakana has no kanji-reading knowledge (that needs a morphological
-// analyzer like MeCab/Kuromoji), so pasted Kanji can only be read back via an
-// exact-match lookup against this bundled dictionary, not via wanakana.toRomaji.
-// It is built lazily on the first Kanji lookup rather than at module load: inverting
-// the whole dictionary is a 30k+ iteration pass that would otherwise run on every
-// launch, including the common case where the user only ever types Romaji.
-let kanjiToReadings: Map<string, ReadingCandidate[]> | undefined;
-
-function readingsForKanji(kanji: string): ReadingCandidate[] {
-  if (!kanjiToReadings) {
-    kanjiToReadings = new Map<string, ReadingCandidate[]>();
-    for (const [reading, candidates] of kanjiDictionary) {
-      for (const candidate of candidates) {
-        let readings = kanjiToReadings.get(candidate.kanji);
-        if (!readings) {
-          readings = [];
-          kanjiToReadings.set(candidate.kanji, readings);
-        }
-        readings.push({ reading, gloss: candidate.gloss });
-      }
-    }
-  }
-  return kanjiToReadings.get(kanji) ?? [];
 }
 
 async function loadHistory(): Promise<HistoryEntry[]> {
