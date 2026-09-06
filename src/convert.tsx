@@ -19,6 +19,7 @@ import englishIndexData from "./data/english-index.json";
 import {
   JAPANESE_SCRIPT,
   KANJI_SCRIPT,
+  isStrandedRomaji,
   toHiraganaFinal,
   toKatakanaFinal,
 } from "./romaji";
@@ -280,6 +281,10 @@ export default function Command() {
     () => (reverseMode ? [] : searchEnglish(trimmed)),
     [reverseMode, trimmed],
   );
+  // An English query is not Romaji, so its "conversion" is noise ("green tea" ->
+  // "gれえん てあ"). Suppress the kana rows in that case and let the English
+  // results stand on their own.
+  const showKanaRows = !isStrandedRomaji(hiragana);
 
   function recordHistory(entry: HistoryEntry) {
     if (!keepHistory) return;
@@ -801,34 +806,46 @@ export default function Command() {
           )}
           {renderKanjiSection()}
         </>
+      ) : !showKanaRows &&
+        kanjiCandidates.length === 0 &&
+        englishResults.length === 0 ? (
+        <List.EmptyView
+          icon={Icon.MagnifyingGlass}
+          title="No matches"
+          description="Type Romaji for a kana conversion, or an English word to search the dictionary."
+        />
       ) : (
         <>
-          <List.Item
-            title={hiragana}
-            subtitle="Hiragana"
-            icon={Icon.Circle}
-            actions={
-              <ActionPanel>
-                {buildActions(hiragana, "Hiragana", () =>
-                  recordHistory(currentEntry),
-                )}
-                {renderExtras({ entry: currentEntry, speak: hiragana })}
-              </ActionPanel>
-            }
-          />
-          <List.Item
-            title={katakana}
-            subtitle="Katakana"
-            icon={Icon.Circle}
-            actions={
-              <ActionPanel>
-                {buildActions(katakana, "Katakana", () =>
-                  recordHistory(currentEntry),
-                )}
-                {renderExtras({ entry: currentEntry, speak: katakana })}
-              </ActionPanel>
-            }
-          />
+          {showKanaRows && (
+            <List.Item
+              title={hiragana}
+              subtitle="Hiragana"
+              icon={Icon.Circle}
+              actions={
+                <ActionPanel>
+                  {buildActions(hiragana, "Hiragana", () =>
+                    recordHistory(currentEntry),
+                  )}
+                  {renderExtras({ entry: currentEntry, speak: hiragana })}
+                </ActionPanel>
+              }
+            />
+          )}
+          {showKanaRows && (
+            <List.Item
+              title={katakana}
+              subtitle="Katakana"
+              icon={Icon.Circle}
+              actions={
+                <ActionPanel>
+                  {buildActions(katakana, "Katakana", () =>
+                    recordHistory(currentEntry),
+                  )}
+                  {renderExtras({ entry: currentEntry, speak: katakana })}
+                </ActionPanel>
+              }
+            />
+          )}
           {renderKanjiSection()}
           {renderEnglishSection()}
         </>

@@ -6,7 +6,7 @@ If you're learning Japanese, researching a trip, or looking up an authentic reci
 
 This is a quick lookup tool, not a full Japanese input method: Kanji suggestions come from a bundled dictionary of common single words, matched by exact reading, not from a grammar-aware conversion engine. It won't turn a full sentence into natural Kanji the way switching your OS to a Japanese IME would — for that, this is a shortcut for one word at a time, not a replacement.
 
-## Command
+## Commands
 
 ### Convert Romaji to Kana
 
@@ -51,6 +51,8 @@ By default, the last 10 romaji lookups are remembered and shown as a **Recent** 
 
 - **Primary Action** — what pressing <kbd>Enter</kbd> on a result does: copy and close Raycast (default), copy only, or paste to the frontmost app.
 - **Recent Conversions** — toggle whether recent conversions are remembered and shown when the search bar is empty. Enabled by default.
+- **Pronunciation Voice** — which macOS system voice the Pronounce action uses: Kyoko (female, default), Otoya (male), or your system default.
+- **Target Script** (Convert Clipboard) — whether Romaji in the clipboard becomes Hiragana (default) or Katakana.
 
 ## Pronunciation, furigana, and saved words
 
@@ -59,6 +61,8 @@ Any result can be spoken aloud with `⌘P`, using a macOS system voice (Kyoko or
 Results that have a Kanji spelling can also be copied as furigana in three formats — `猫(ねこ)`, `猫[ねこ]` (Anki/Markdown), and `<ruby>猫<rt>ねこ</rt></ruby>`.
 
 `⌘S` saves a word to **Saved Words**, which appears above Recent when the search bar is empty. `⌘I` toggles a detail pane showing the reading, Romaji, part of speech, and full meaning.
+
+When the text you type isn't Romaji at all — an English word like `bridge` — the Hiragana and Katakana rows are hidden rather than showing a meaningless character-by-character transliteration, and only the dictionary results are listed.
 
 ## Convert Clipboard
 
