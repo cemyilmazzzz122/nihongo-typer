@@ -15,12 +15,14 @@ import kanjiDictionaryData from "./data/kanji-dictionary.json";
 
 const HISTORY_KEY = "history";
 const HISTORY_LIMIT = 10;
+const KANJI_SCRIPT = /[一-龯]/;
 const JAPANESE_SCRIPT = /[぀-ヿ一-龯]/;
 
 interface HistoryEntry {
   input: string;
   hiragana: string;
   katakana: string;
+  kanji?: string;
 }
 
 interface KanjiCandidate {
@@ -29,9 +31,30 @@ interface KanjiCandidate {
   common: boolean;
 }
 
+interface ReadingCandidate {
+  reading: string;
+  gloss: string;
+}
+
 const kanjiDictionary = new Map<string, KanjiCandidate[]>(
   kanjiDictionaryData.entries as [string, KanjiCandidate[]][],
 );
+
+// Reverse index (kanji spelling -> possible readings), built once from the same
+// data: wanakana has no kanji-reading knowledge (that needs a morphological
+// analyzer like MeCab/Kuromoji), so pasted Kanji can only be read back via an
+// exact-match lookup against this bundled dictionary, not via wanakana.toRomaji.
+const kanjiToReadings = new Map<string, ReadingCandidate[]>();
+for (const [reading, candidates] of kanjiDictionary) {
+  for (const candidate of candidates) {
+    if (!kanjiToReadings.has(candidate.kanji)) {
+      kanjiToReadings.set(candidate.kanji, []);
+    }
+    kanjiToReadings
+      .get(candidate.kanji)!
+      .push({ reading, gloss: candidate.gloss });
+  }
+}
 
 function normalizeRomaji(input: string): string {
   return input.replace(/tch/gi, "cch");
@@ -64,6 +87,12 @@ export default function Command() {
 
   const trimmed = input.trim();
   const reverseMode = trimmed.length > 0 && JAPANESE_SCRIPT.test(trimmed);
+  const containsKanji = KANJI_SCRIPT.test(trimmed);
+  // A pasted word can mix kanji and okurigana (e.g. 食べる) — wanakana can only
+  // romanize the kana part, so a reading lookup is needed whenever any kanji
+  // is present, not just for kanji-only input.
+  const kanjiOnlyMode = reverseMode && containsKanji;
+  const pureKanaMode = reverseMode && !containsKanji;
 
   const normalized = useMemo(() => normalizeRomaji(input), [input]);
   const hiragana = useMemo(
@@ -75,15 +104,19 @@ export default function Command() {
     [normalized],
   );
   const romaji = useMemo(
-    () => (reverseMode ? wanakana.toRomaji(trimmed) : ""),
-    [reverseMode, trimmed],
+    () => (pureKanaMode ? wanakana.toRomaji(trimmed) : ""),
+    [pureKanaMode, trimmed],
   );
-  const readingForLookup = reverseMode
+  const readingForLookup = pureKanaMode
     ? wanakana.toHiragana(trimmed)
     : hiragana;
   const kanjiCandidates = useMemo(
-    () => kanjiDictionary.get(readingForLookup) ?? [],
-    [readingForLookup],
+    () => (kanjiOnlyMode ? [] : (kanjiDictionary.get(readingForLookup) ?? [])),
+    [kanjiOnlyMode, readingForLookup],
+  );
+  const kanjiReadings = useMemo(
+    () => (kanjiOnlyMode ? (kanjiToReadings.get(trimmed) ?? []) : []),
+    [kanjiOnlyMode, trimmed],
   );
 
   function recordHistory(entry: HistoryEntry) {
@@ -156,7 +189,7 @@ export default function Command() {
     return sorted.map((kind) => actionsByKind[kind]);
   }
 
-  const currentEntry: HistoryEntry = reverseMode
+  const currentEntry: HistoryEntry = pureKanaMode
     ? {
         input: trimmed,
         hiragana: readingForLookup,
@@ -177,7 +210,7 @@ export default function Command() {
             actions={
               <ActionPanel>
                 {buildActions(candidate.kanji, "Kanji", () =>
-                  recordHistory(currentEntry),
+                  recordHistory({ ...currentEntry, kanji: candidate.kanji }),
                 )}
               </ActionPanel>
             }
@@ -202,11 +235,19 @@ export default function Command() {
             {history.map((entry) => (
               <List.Item
                 key={entry.input}
-                title={entry.hiragana}
-                subtitle={`${entry.input} · Katakana ${entry.katakana}`}
-                icon={Icon.Clock}
+                title={entry.kanji ?? entry.hiragana}
+                subtitle={
+                  entry.kanji
+                    ? `${entry.input} · ${entry.hiragana} / ${entry.katakana}`
+                    : `${entry.input} · Katakana ${entry.katakana}`
+                }
+                icon={entry.kanji ? Icon.Book : Icon.Clock}
                 actions={
                   <ActionPanel>
+                    {entry.kanji &&
+                      buildActions(entry.kanji, "Kanji", () =>
+                        recordHistory(entry),
+                      )}
                     {buildActions(entry.hiragana, "Hiragana", () =>
                       recordHistory(entry),
                     )}
@@ -239,7 +280,42 @@ export default function Command() {
             description="Hiragana and Katakana results will appear here"
           />
         )
-      ) : reverseMode ? (
+      ) : kanjiOnlyMode ? (
+        kanjiReadings.length > 0 ? (
+          <List.Section title="Readings">
+            {kanjiReadings.map((candidate) => {
+              const candidateRomaji = wanakana.toRomaji(candidate.reading);
+              const entry: HistoryEntry = {
+                input: trimmed,
+                hiragana: candidate.reading,
+                katakana: wanakana.toKatakana(candidate.reading),
+                kanji: trimmed,
+              };
+              return (
+                <List.Item
+                  key={candidate.reading}
+                  title={candidateRomaji}
+                  subtitle={`Romaji · reading: ${candidate.reading} — ${candidate.gloss}`}
+                  icon={Icon.Circle}
+                  actions={
+                    <ActionPanel>
+                      {buildActions(candidateRomaji, "Romaji", () =>
+                        recordHistory(entry),
+                      )}
+                    </ActionPanel>
+                  }
+                />
+              );
+            })}
+          </List.Section>
+        ) : (
+          <List.EmptyView
+            icon={Icon.QuestionMarkCircle}
+            title="No known reading for this Kanji"
+            description="This word isn't in the bundled dictionary, so Romaji can't be generated for it."
+          />
+        )
+      ) : pureKanaMode ? (
         <>
           <List.Item
             title={romaji}

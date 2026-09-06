@@ -25,9 +25,11 @@ If the current Hiragana reading matches a common Japanese word, a **Kanji** sect
 
 Matching is exact-reading, single-word lookup against a bundled dictionary of ~17,000 common words — it won't segment or convert a multi-word phrase or full sentence into Kanji.
 
-### Reverse lookup: Kana to Romaji
+### Reverse lookup: Kana or Kanji to Romaji
 
-Paste or type Hiragana, Katakana, or Kanji into the search bar and the command switches to a single **Romaji** result instead, so you can go the other direction without a separate command.
+Paste or type Hiragana or Katakana into the search bar and the command switches to a single **Romaji** result instead, so you can go the other direction without a separate command.
+
+Pasting Kanji works too, but differently: `wanakana` has no built-in knowledge of Kanji readings (that requires a full morphological analyzer, e.g. MeCab/Kuromoji, which this extension deliberately doesn't depend on — see **Privacy**), so a pasted Kanji word is looked up in the same bundled dictionary used for Kanji suggestions. If the word is known, every possible reading is listed as **Readings** (e.g. `日本` → `にほん`/Nihon and `にっぽん`/Nippon, since it genuinely has two common readings); if it isn't in the dictionary, you'll see "No known reading for this Kanji" instead of a silently wrong result.
 
 ### Recent conversions
 
