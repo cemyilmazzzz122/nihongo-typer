@@ -2,7 +2,7 @@
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "nihongo-typer",
   "title": "Nihongo Typer",
-  "description": "Raycast extension that converts Romaji typed into the search bar into Hiragana, Katakana, and common-word Kanji in real time.",
+  "description": "Raycast extension that converts Romaji typed into the search bar into Hiragana, Katakana, and common-word Kanji in real time, plus reverse Kanji lookup and English word search.",
   "icon": "icon.png",
   "author": "theseriouscatttt",
   "license": "MIT",

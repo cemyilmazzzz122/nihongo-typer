@@ -12,9 +12,12 @@ import {
 } from "@raycast/api";
 import * as wanakana from "wanakana";
 import kanjiDictionaryData from "./data/kanji-dictionary.json";
+import englishIndexData from "./data/english-index.json";
 
 const HISTORY_KEY = "history";
 const HISTORY_LIMIT = 10;
+const ENGLISH_MIN_WORD_LENGTH = 3;
+const ENGLISH_MAX_RESULTS = 8;
 const KANJI_SCRIPT = /[一-龯]/;
 const JAPANESE_SCRIPT = /[぀-ヿ一-龯]/;
 
@@ -36,9 +39,45 @@ interface ReadingCandidate {
   gloss: string;
 }
 
+interface WordEntry {
+  reading: string;
+  kanji?: string;
+  gloss: string;
+}
+
 const kanjiDictionary = new Map<string, KanjiCandidate[]>(
   kanjiDictionaryData.entries as [string, KanjiCandidate[]][],
 );
+
+// English -> Japanese search data: `words` is a deduped table of { reading,
+// kanji?, gloss } entries, and `entries` maps an english gloss word to indices
+// into that table — see scripts/build-kanji-dictionary.mjs for how both are
+// derived from the same jmdict-simplified release as the kanji dictionary.
+const englishWords = englishIndexData.words as WordEntry[];
+const englishIndex = new Map<string, number[]>(
+  englishIndexData.entries as [string, number[]][],
+);
+
+function searchEnglish(query: string): WordEntry[] {
+  const words = query
+    .toLowerCase()
+    .split(/[^a-z']+/)
+    .filter((w) => w.length >= ENGLISH_MIN_WORD_LENGTH);
+  if (words.length === 0) return [];
+
+  const [first, ...rest] = words;
+  const indices = englishIndex.get(first);
+  if (!indices) return [];
+
+  const candidates = indices.map((i) => englishWords[i]);
+  const filtered =
+    rest.length === 0
+      ? candidates
+      : candidates.filter((c) =>
+          rest.every((w) => c.gloss.toLowerCase().includes(w)),
+        );
+  return filtered.slice(0, ENGLISH_MAX_RESULTS);
+}
 
 // Reverse index (kanji spelling -> possible readings), built once from the same
 // data: wanakana has no kanji-reading knowledge (that needs a morphological
@@ -117,6 +156,10 @@ export default function Command() {
   const kanjiReadings = useMemo(
     () => (kanjiOnlyMode ? (kanjiToReadings.get(trimmed) ?? []) : []),
     [kanjiOnlyMode, trimmed],
+  );
+  const englishResults = useMemo(
+    () => (reverseMode ? [] : searchEnglish(trimmed)),
+    [reverseMode, trimmed],
   );
 
   function recordHistory(entry: HistoryEntry) {
@@ -220,11 +263,50 @@ export default function Command() {
     );
   }
 
+  function renderEnglishSection() {
+    if (englishResults.length === 0) return null;
+    return (
+      <List.Section title="English → Japanese">
+        {englishResults.map((result, index) => {
+          const entry: HistoryEntry = {
+            input: trimmed,
+            hiragana: result.reading,
+            katakana: wanakana.toKatakana(result.reading),
+            kanji: result.kanji,
+          };
+          return (
+            <List.Item
+              key={`${result.reading}-${result.kanji ?? index}`}
+              title={result.kanji ?? result.reading}
+              subtitle={
+                result.kanji
+                  ? `${result.reading} — ${result.gloss}`
+                  : result.gloss
+              }
+              icon={Icon.MagnifyingGlass}
+              actions={
+                <ActionPanel>
+                  {result.kanji &&
+                    buildActions(result.kanji, "Kanji", () =>
+                      recordHistory(entry),
+                    )}
+                  {buildActions(result.reading, "Hiragana", () =>
+                    recordHistory(entry),
+                  )}
+                </ActionPanel>
+              }
+            />
+          );
+        })}
+      </List.Section>
+    );
+  }
+
   const showHistory = keepHistory && input.length === 0 && history.length > 0;
 
   return (
     <List
-      searchBarPlaceholder="Type Romaji, e.g. matcha — or paste kana for Romaji"
+      searchBarPlaceholder="Type Romaji or English, e.g. matcha / bridge — or paste Kana/Kanji"
       searchText={input}
       onSearchTextChange={setInput}
       filtering={false}
@@ -276,8 +358,8 @@ export default function Command() {
         ) : (
           <List.EmptyView
             icon={Icon.Text}
-            title="Type Romaji to convert"
-            description="Hiragana and Katakana results will appear here"
+            title="Type Romaji or English to search"
+            description="Hiragana, Katakana, Kanji, and English lookup results will appear here"
           />
         )
       ) : kanjiOnlyMode ? (
@@ -358,6 +440,7 @@ export default function Command() {
             }
           />
           {renderKanjiSection()}
+          {renderEnglishSection()}
         </>
       )}
     </List>

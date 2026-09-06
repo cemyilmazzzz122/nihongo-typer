@@ -1,8 +1,8 @@
 # Nihongo Typer
 
-A Raycast extension that converts Romaji into Hiragana, Katakana, and common-word Kanji in real time — no need to switch your system keyboard layout to Japanese.
+A Raycast extension that converts Romaji into Hiragana, Katakana, and common-word Kanji in real time, looks Kanji back up to its reading, and searches an English word straight to its Japanese equivalent — no need to switch your system keyboard layout to Japanese.
 
-If you're learning Japanese, researching a trip, or looking up an authentic recipe, this lets you type a word the way you already type (Latin letters) and get kana readings — plus likely Kanji spellings for known words — instantly, ready to paste anywhere.
+If you're learning Japanese, researching a trip, or looking up an authentic recipe, this lets you type a word the way you already type (Latin letters, or plain English) and get kana readings, likely Kanji spellings, and English matches instantly, ready to paste anywhere.
 
 This is a quick lookup tool, not a full Japanese input method: Kanji suggestions come from a bundled dictionary of common single words, matched by exact reading, not from a grammar-aware conversion engine. It won't turn a full sentence into natural Kanji the way switching your OS to a Japanese IME would — for that, this is a shortcut for one word at a time, not a replacement.
 
@@ -31,6 +31,12 @@ Paste or type Hiragana or Katakana into the search bar and the command switches 
 
 Pasting Kanji works too, but differently: `wanakana` has no built-in knowledge of Kanji readings (that requires a full morphological analyzer, e.g. MeCab/Kuromoji, which this extension deliberately doesn't depend on — see **Privacy**), so a pasted Kanji word is looked up in the same bundled dictionary used for Kanji suggestions. If the word is known, every possible reading is listed as **Readings** (e.g. `日本` → `にほん`/Nihon and `にっぽん`/Nippon, since it genuinely has two common readings); if it isn't in the dictionary, you'll see "No known reading for this Kanji" instead of a silently wrong result.
 
+### English → Japanese search
+
+Type an English word (or a short phrase, e.g. `green tea`) instead of Romaji, and an **English → Japanese** section appears below the usual Hiragana/Katakana/Kanji results with matching Japanese words — e.g. `bridge` → `橋` (はし). Each result shows its reading and gloss, and Kanji is offered as a separate copy action when the word has one.
+
+This is a word-lookup, not a full thesaurus: matching is by whole word against a bundled index of ~22,000 common words' glosses, ranked so a word whose core meaning is the term you searched (e.g. 橋's gloss is literally "bridge") outranks one that merely mentions it in passing (e.g. a compound word whose gloss mentions "bridge" as an aside) — but with no real frequency data to draw on beyond JMdict's own common-word flag, ranking is a heuristic, not a guarantee the very first result is the best one for uncommon words.
+
 ### Recent conversions
 
 By default, the last 10 romaji lookups are remembered and shown as a **Recent** list whenever the search bar is empty, so you can quickly re-copy a word without retyping it. Turn this off in **Preferences** if you'd rather nothing be remembered between searches.
@@ -48,15 +54,15 @@ By default, the last 10 romaji lookups are remembered and shown as a **Recent** 
 
 ## Privacy
 
-All conversion happens entirely locally, in-process. No network requests are made and no text you type ever leaves your machine. Recent conversions (when enabled) are stored only in Raycast's local, on-device storage for this extension — never synced or sent anywhere. The Kanji dictionary is a static file bundled with the extension, not a live lookup service.
+All conversion happens entirely locally, in-process. No network requests are made and no text you type ever leaves your machine. Recent conversions (when enabled) are stored only in Raycast's local, on-device storage for this extension — never synced or sent anywhere. Both the Kanji dictionary and the English search index are static files bundled with the extension, not a live lookup service.
 
-## Kanji dictionary & attribution
+## Dictionary data & attribution
 
-Kanji suggestions are generated ahead of time (see `scripts/build-kanji-dictionary.mjs`) from the `jmdict-eng-common` release of [jmdict-simplified](https://github.com/scriptin/jmdict-simplified), itself built from the **JMdict/EDICT** dictionary files.
+Kanji suggestions, the Kanji-to-reading lookup, and English search are all generated ahead of time (see `scripts/build-kanji-dictionary.mjs`) from the `jmdict-eng-common` release of [jmdict-simplified](https://github.com/scriptin/jmdict-simplified), itself built from the **JMdict/EDICT** dictionary files.
 
 This software uses the JMdict/EDICT dictionary files. These files are the property of the Electronic Dictionary Research and Development Group, and are used in conformance with the Group's licence.
 
-The dictionary data (`src/data/kanji-dictionary.json`) is licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) by the EDRDG — this applies to that data file only; the extension's own source code is MIT licensed (see [License](#license)).
+The dictionary data (`src/data/kanji-dictionary.json`, `src/data/english-index.json`) is licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) by the EDRDG — this applies to those data files only; the extension's own source code is MIT licensed (see [License](#license)).
 
 ## Development
 
@@ -67,7 +73,7 @@ npm run build   # type-check and build
 npm run lint    # lint against Raycast's extension rules
 ```
 
-To regenerate `src/data/kanji-dictionary.json` from a newer `jmdict-simplified` release, see the usage comment at the top of `scripts/build-kanji-dictionary.mjs`.
+To regenerate `src/data/kanji-dictionary.json` and `src/data/english-index.json` from a newer `jmdict-simplified` release, see the usage comment at the top of `scripts/build-kanji-dictionary.mjs`.
 
 ## License
 
