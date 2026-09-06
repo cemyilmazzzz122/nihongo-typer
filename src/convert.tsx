@@ -111,30 +111,18 @@ function readingsForKanji(kanji: string): ReadingCandidate[] {
 }
 
 function normalizeRomaji(input: string): string {
-  return input.replace(/tch/gi, "cch");
-}
-
-// IMEMode leaves a word-final lone "n" as latin, since a real IME must wait to
-// see whether the user is still typing "na"/"ni"/... . The search bar shows a
-// finished result rather than a mid-composition buffer, so complete it here:
-// without this, "nihon" renders as にほn and the dictionary lookup for にほん
-// (and every other word ending in ん) silently misses.
-function completeTrailingN(kana: string, syllabicN: string): string {
-  return kana.replace(/n$/, syllabicN);
+  // `tch` -> `cch` so casual spellings like "matcha" get the sokuon, and a
+  // word-final `nn` -> `n` so the IME habit of typing "nihonn" still yields
+  // にほん (plain wanakana would read that second n as its own syllable).
+  return input.replace(/tch/gi, "cch").replace(/nn$/i, "n");
 }
 
 function toHiraganaFinal(input: string): string {
-  return completeTrailingN(
-    wanakana.toHiragana(input, { IMEMode: true }),
-    "\u3093",
-  );
+  return wanakana.toHiragana(input);
 }
 
 function toKatakanaFinal(input: string): string {
-  return completeTrailingN(
-    wanakana.toKatakana(input, { IMEMode: true }),
-    "\u30f3",
-  );
+  return wanakana.toKatakana(input);
 }
 
 async function loadHistory(): Promise<HistoryEntry[]> {
@@ -259,10 +247,10 @@ export default function Command() {
       "copyOnly",
       "paste",
     ];
-    const sorted = [
-      primaryAction,
-      ...order.filter((kind) => kind !== primaryAction),
-    ];
+    // Fall back rather than trusting the preference blindly: a missing or stale
+    // stored value would otherwise put `undefined` at the head of the panel.
+    const active = order.includes(primaryAction) ? primaryAction : order[0];
+    const sorted = [active, ...order.filter((kind) => kind !== active)];
     return sorted.map((kind) => actionsByKind[kind]);
   }
 
@@ -423,6 +411,14 @@ export default function Command() {
                       {buildActions(candidateRomaji, "Romaji", () =>
                         recordHistory(entry),
                       )}
+                      {/* Someone pasting Kanji usually wants its kana reading
+                          at least as often as the Romaji, so offer both. */}
+                      {buildActions(candidate.reading, "Hiragana", () =>
+                        recordHistory(entry),
+                      )}
+                      {buildActions(entry.katakana, "Katakana", () =>
+                        recordHistory(entry),
+                      )}
                     </ActionPanel>
                   }
                 />
@@ -450,6 +446,36 @@ export default function Command() {
               </ActionPanel>
             }
           />
+          {/* Kana-to-kana: show whichever script the input isn't already in,
+              so pasted ねこ also offers ネコ (and コーヒー offers こうひい). */}
+          {hiragana !== trimmed && (
+            <List.Item
+              title={hiragana}
+              subtitle="Hiragana"
+              icon={Icon.Circle}
+              actions={
+                <ActionPanel>
+                  {buildActions(hiragana, "Hiragana", () =>
+                    recordHistory(currentEntry),
+                  )}
+                </ActionPanel>
+              }
+            />
+          )}
+          {katakana !== trimmed && (
+            <List.Item
+              title={katakana}
+              subtitle="Katakana"
+              icon={Icon.Circle}
+              actions={
+                <ActionPanel>
+                  {buildActions(katakana, "Katakana", () =>
+                    recordHistory(currentEntry),
+                  )}
+                </ActionPanel>
+              }
+            />
+          )}
           {renderKanjiSection()}
         </>
       ) : (
