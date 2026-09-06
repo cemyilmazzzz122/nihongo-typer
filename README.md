@@ -52,6 +52,18 @@ By default, the last 10 romaji lookups are remembered and shown as a **Recent** 
 - **Primary Action** — what pressing <kbd>Enter</kbd> on a result does: copy and close Raycast (default), copy only, or paste to the frontmost app.
 - **Recent Conversions** — toggle whether recent conversions are remembered and shown when the search bar is empty. Enabled by default.
 
+## Pronunciation, furigana, and saved words
+
+Any result can be spoken aloud with `⌘P`, using a macOS system voice (Kyoko or Otoya, selectable in preferences). Both are optional macOS downloads; if neither is installed the extension falls back to your default system voice.
+
+Results that have a Kanji spelling can also be copied as furigana in three formats — `猫(ねこ)`, `猫[ねこ]` (Anki/Markdown), and `<ruby>猫<rt>ねこ</rt></ruby>`.
+
+`⌘S` saves a word to **Saved Words**, which appears above Recent when the search bar is empty. `⌘I` toggles a detail pane showing the reading, Romaji, part of speech, and full meaning.
+
+## Convert Clipboard
+
+A second, windowless command converts Romaji already in your clipboard and pastes the kana straight into the app you're typing in — no Raycast window opens. Assign it a hotkey and it works mid-sentence. Japanese in the clipboard is converted back to Romaji instead.
+
 ## Privacy
 
 All conversion happens entirely locally, in-process. No network requests are made and no text you type ever leaves your machine. Recent conversions (when enabled) are stored only in Raycast's local, on-device storage for this extension — never synced or sent anywhere. Both the Kanji dictionary and the English search index are static files bundled with the extension, not a live lookup service.

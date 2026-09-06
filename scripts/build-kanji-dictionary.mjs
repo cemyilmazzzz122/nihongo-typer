@@ -79,6 +79,21 @@ function scoreGlossTokens(gloss) {
   return scores;
 }
 
+// JMdict carries no JLPT levels — that would need a separately-licensed word
+// list — but every sense does carry `partOfSpeech` codes, which are what the UI
+// shows as a tag. Only the codes actually used are emitted, with the label
+// shortened to its leading phrase ("noun (common) (futsuumeishi)" -> "noun").
+const posLabels = new Map();
+function posOf(sense) {
+  const code = sense.partOfSpeech[0];
+  if (!code) return undefined;
+  if (!posLabels.has(code)) {
+    const raw_label = raw.tags[code] ?? code;
+    posLabels.set(code, stripParens(raw_label).replace(/\s+/g, " ").trim());
+  }
+  return code;
+}
+
 /** hiragana reading -> Map<kanjiText, { kanji, gloss, common }> (for Kanji suggestions + reverse Kanji lookup) */
 const kanjiMap = new Map();
 
@@ -95,6 +110,8 @@ for (const word of raw.words) {
     .map((g) => g.text)
     .join("; ");
   if (!gloss) continue;
+
+  const pos = posOf(firstSense);
 
   // --- Kanji suggestions / reverse Kanji lookup (only words that have a Kanji spelling) ---
   if (word.kanji.length) {
@@ -113,6 +130,7 @@ for (const word of raw.words) {
           candidates.set(kanji.text, {
             kanji: kanji.text,
             gloss,
+            pos,
             common: Boolean(kanji.common && kana.common),
           });
         }
@@ -139,7 +157,9 @@ for (const word of raw.words) {
     kanjiSpelling = pick?.text;
   }
 
-  const entry = kanjiSpelling ? { reading, kanji: kanjiSpelling, gloss } : { reading, gloss };
+  const entry = kanjiSpelling
+    ? { reading, kanji: kanjiSpelling, gloss, pos }
+    : { reading, gloss, pos };
   const common = Boolean(primaryKana.common);
 
   for (const [token, score] of scoreGlossTokens(gloss)) {
@@ -157,7 +177,7 @@ const kanjiEntries = [...kanjiMap].map(([reading, candidates]) => [
   reading,
   [...candidates.values()]
     .sort((a, b) => Number(b.common) - Number(a.common))
-    .map(({ kanji, gloss }) => ({ kanji, gloss })),
+    .map(({ kanji, gloss, pos }) => ({ kanji, gloss, pos })),
 ]);
 
 // Word entries are heavily shared across tokens (a single gloss like "matcha;
@@ -202,6 +222,7 @@ writeFileSync(
     version: raw.version,
     license:
       "CC BY-SA 4.0 — JMdict/EDICT project, Electronic Dictionary Research and Development Group",
+    posLabels: [...posLabels],
     entries: kanjiEntries,
   }),
 );
@@ -217,6 +238,7 @@ writeFileSync(
     // dropped when indexing; keeping a second hand-written copy in the extension
     // would silently drift from this one.
     stopwords: [...ENGLISH_STOPWORDS],
+    posLabels: [...posLabels],
     words: wordList,
     entries: englishEntries,
   }),

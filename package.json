@@ -26,9 +26,18 @@
           "required": false,
           "default": "copyAndClose",
           "data": [
-            { "title": "Copy and Close Raycast", "value": "copyAndClose" },
-            { "title": "Copy Only", "value": "copyOnly" },
-            { "title": "Paste to Active App", "value": "paste" }
+            {
+              "title": "Copy and Close Raycast",
+              "value": "copyAndClose"
+            },
+            {
+              "title": "Copy Only",
+              "value": "copyOnly"
+            },
+            {
+              "title": "Paste to Active App",
+              "value": "paste"
+            }
           ]
         },
         {
@@ -39,6 +48,55 @@
           "label": "Keep a history of recent conversions",
           "required": false,
           "default": true
+        },
+        {
+          "name": "voice",
+          "title": "Pronunciation Voice",
+          "description": "macOS system voice used by the Pronounce action",
+          "type": "dropdown",
+          "required": false,
+          "default": "Kyoko",
+          "data": [
+            {
+              "title": "Kyoko (female)",
+              "value": "Kyoko"
+            },
+            {
+              "title": "Otoya (male)",
+              "value": "Otoya"
+            },
+            {
+              "title": "System default",
+              "value": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "convert-clipboard",
+      "title": "Convert Clipboard",
+      "subtitle": "Nihongo Typer",
+      "description": "Convert Romaji in the clipboard to Kana and paste it into the active app",
+      "mode": "no-view",
+      "preferences": [
+        {
+          "name": "clipboardTarget",
+          "title": "Target Script",
+          "description": "Which script Romaji in the clipboard is converted to",
+          "type": "dropdown",
+          "required": false,
+          "default": "hiragana",
+          "data": [
+            {
+              "title": "Hiragana",
+              "value": "hiragana"
+            },
+            {
+              "title": "Katakana",
+              "value": "katakana"
+            }
+          ]
         }
       ]
     }
